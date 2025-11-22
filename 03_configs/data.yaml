@@ -1,0 +1,31 @@
+# データ設定
+
+data:
+  # データパス
+  train_path: "data/raw/train.csv"
+  test_path: "data/raw/test.csv"
+  sample_submit_path: "data/raw/sample_submit.csv"
+
+  # ターゲット列
+  target_column: "money_room"
+
+  # ID列（テストデータのみ）
+  id_column: "id"  # trainにはidなし、testにはidあり
+
+  # 時系列列
+  time_column: "target_ym"
+
+  # 処理済みデータ保存先
+  processed_dir: "data/processed"
+
+  # データ分割設定
+  split:
+    method: "time_series"  # "random", "stratified", "time_series"
+    val_size: 0.2
+    test_size: 0.0  # コンペではtestデータが別途提供される
+
+    # 時系列分割の場合
+    time_based:
+      # 学習: 2019-2022年、検証: 2022年後半など
+      train_end: 202207  # 2022年7月まで学習
+      val_start: 202301  # 2023年1月から検証

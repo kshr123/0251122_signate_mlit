@@ -1,0 +1,75 @@
+# 特徴量生成設定
+
+features:
+  # 特徴量生成を有効化するカテゴリ
+  enabled:
+    - "basic"           # 基本的な特徴量
+    - "aggregation"     # 集約特徴量
+    - "interaction"     # 交互作用特徴量
+    - "location"        # 位置情報特徴量（GISデータ）
+    # - "text"          # テキスト特徴量（必要に応じて）
+
+  # 基本特徴量
+  basic:
+    # 築年数を計算
+    building_age:
+      enabled: true
+      reference_year: 2023  # 基準年
+
+    # 面積あたりの価格
+    price_per_area:
+      enabled: true
+      numerator: "money_room"
+      denominator: "house_area"
+
+  # 集約特徴量
+  aggregation:
+    # 駅ごとの統計量
+    by_station:
+      enabled: true
+      group_by: ["eki_name1"]
+      target: "money_room"
+      aggregations:
+        - "mean"
+        - "median"
+        - "std"
+
+    # 市区町村ごとの統計量
+    by_city:
+      enabled: true
+      group_by: ["shikuchouson_code"]
+      target: "money_room"
+      aggregations:
+        - "mean"
+        - "median"
+
+  # 交互作用特徴量
+  interaction:
+    enabled: false
+    # EDA後に有用な組み合わせを追加
+    # 例: ["building_area", "room_count"]
+
+  # 位置情報特徴量（GISデータ）
+  location:
+    enabled: true
+
+    # 主要駅までの距離
+    major_stations:
+      - name: "tokyo"
+        lat: 35.681236
+        lon: 139.767125
+      - name: "shinjuku"
+        lat: 35.689729
+        lon: 139.700272
+      - name: "shibuya"
+        lat: 35.658034
+        lon: 139.701636
+
+    # 外部GISデータ（国土数値情報）
+    external_gis:
+      enabled: false  # データ取得後にtrue
+      data_dir: "data/external/gis"
+      features:
+        - "population_density"   # 人口密度
+        - "land_price"          # 地価
+        - "facility_distance"   # 施設までの距離

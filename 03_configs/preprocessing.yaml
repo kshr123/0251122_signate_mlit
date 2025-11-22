@@ -1,0 +1,59 @@
+# 前処理設定
+
+preprocessing:
+  # 削除するカラム（EDA後に追加）
+  drop_columns: []
+
+  # 数値変数の処理
+  numerical:
+    # 対数変換（分布が歪んでいる場合）
+    log_transform: []
+    # 例: log_transform: ["money_room", "building_area"]
+
+    # 標準化
+    standard_scale: []
+    # 例: standard_scale: ["walk_distance1", "walk_distance2"]
+
+    # Min-Maxスケーリング
+    minmax_scale: []
+
+    # 外れ値処理
+    outlier_clip:
+      enabled: false
+      method: "iqr"  # "iqr" or "percentile"
+      lower_percentile: 1
+      upper_percentile: 99
+
+  # カテゴリ変数の処理
+  categorical:
+    # Target Encoding
+    target_encode: []
+    # 例: target_encode: ["eki_name1", "shikuchouson_code"]
+
+    # One-Hot Encoding
+    onehot_encode: []
+    # 例: onehot_encode: ["building_type", "building_structure"]
+
+    # Label Encoding
+    label_encode: []
+
+    # Frequency Encoding
+    frequency_encode: []
+
+  # 欠損値処理
+  missing:
+    # 数値変数
+    numerical_strategy: "median"  # "mean", "median", "mode", "constant"
+    numerical_fill_value: 0
+
+    # カテゴリ変数
+    categorical_strategy: "mode"  # "mode", "constant"
+    categorical_fill_value: "missing"
+
+  # 時系列特徴量（対象年月から生成）
+  temporal:
+    enabled: true
+    extract_features:
+      - "year"
+      - "month"
+      - "quarter"

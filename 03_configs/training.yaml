@@ -1,0 +1,32 @@
+# 学習設定
+
+training:
+  # クロスバリデーション
+  cross_validation:
+    enabled: true
+    method: "time_series"  # "kfold", "stratified", "time_series"
+    n_splits: 5
+
+    # 時系列CVの設定
+    time_series:
+      gap: 0  # 学習データと検証データの間のギャップ（月数）
+      max_train_size: null  # 学習データの最大サイズ
+
+  # 評価指標
+  metrics:
+    primary: "rmse"  # メイン評価指標
+    additional:
+      - "mae"
+      - "r2"
+      # - "rmsle"  # 目的変数が正の場合
+
+  # 学習オプション
+  options:
+    verbose: true
+    save_model: true
+    save_predictions: true
+
+  # モデル保存先
+  output:
+    model_dir: "models"
+    prediction_dir: "submissions"

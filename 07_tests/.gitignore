@@ -1,0 +1,15 @@
+# テスト結果（すべて除外）
+**/test_results/
+
+# Pytestキャッシュ
+__pycache__/
+.pytest_cache/
+*.pyc
+
+# カバレッジ
+.coverage
+htmlcov/
+
+# ただし、test_resultsディレクトリ自体は保持
+!**/test_results/
+!**/test_results/.gitkeep

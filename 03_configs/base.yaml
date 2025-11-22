@@ -1,0 +1,16 @@
+# プロジェクト基本設定
+
+project:
+  name: "real_estate_price_prediction"
+  description: "LIFULL × 国土交通省 不動産売買価格予測コンペ"
+  task_type: "regression"
+  random_seed: 42
+
+experiment:
+  backend: "mlflow"  # "mlflow" or "wandb"
+  auto_log: true
+  tracking_uri: "mlruns"  # MLflowの場合のディレクトリ
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

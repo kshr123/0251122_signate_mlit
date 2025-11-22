@@ -1,0 +1,51 @@
+# モデル設定
+
+model:
+  # 使用するモデル: "lightgbm", "xgboost", "catboost"
+  type: "lightgbm"
+
+  # LightGBM設定
+  lightgbm:
+    objective: "regression"
+    metric: "rmse"
+    boosting_type: "gbdt"
+    num_leaves: 31
+    learning_rate: 0.05
+    feature_fraction: 0.9
+    bagging_fraction: 0.8
+    bagging_freq: 5
+    verbose: -1
+    num_boost_round: 1000
+    early_stopping_rounds: 50
+
+  # XGBoost設定
+  xgboost:
+    objective: "reg:squarederror"
+    eval_metric: "rmse"
+    max_depth: 6
+    learning_rate: 0.05
+    subsample: 0.8
+    colsample_bytree: 0.8
+    n_estimators: 1000
+    early_stopping_rounds: 50
+
+  # CatBoost設定
+  catboost:
+    loss_function: "RMSE"
+    iterations: 1000
+    learning_rate: 0.05
+    depth: 6
+    early_stopping_rounds: 50
+    verbose: 100
+
+  # アンサンブル設定
+  ensemble:
+    enabled: false
+    method: "weighted_average"  # "weighted_average", "stacking"
+    models:
+      - type: "lightgbm"
+        weight: 0.5
+      - type: "xgboost"
+        weight: 0.3
+      - type: "catboost"
+        weight: 0.2
