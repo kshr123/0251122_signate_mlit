@@ -95,9 +95,117 @@
 - 品質: 使い捨てOK、試行錯誤の記録
 - テスト: 不要
 - **EDA実行時は `.claude/eda_guide.md` を参照**
+- **データ読み込みは必ずDataLoaderパターンを使用**（後述）
 
 **04_src/（本実装）**:
 - 目的: 再利用可能なコード、本番投入
+
+#### 2. ⚠️ **Jupyter Notebookのエラー対応ルール**
+
+**原則**: Notebookは常にエラーなく最後まで実行できる状態を保つ
+
+- **作成時**: 全セルを実行してエラーがないことを確認してからcommit
+- **修正時**: エラーが発生した場合は即座に修正
+- **実行順**: セルは上から順に実行して成功する設計にする
+- **理由**: 他の人（または将来の自分）が再実行できるようにするため
+
+#### 3. 🔒 **パス表示のプライバシールール**
+
+**原則**: パスを表示する場合は必ずプロジェクトルートからの相対パスにする
+
+```python
+# ❌ 絶対パスは個人情報が含まれる
+print(f"データディレクトリ: /Users/kotaro/Desktop/ML/project/data/raw")
+
+# ✅ プロジェクトルートからの相対パス
+PROJECT_ROOT = Path.cwd().parent.parent  # notebookの場合
+DATA_DIR = PROJECT_ROOT / "data" / "raw"
+print(f"データディレクトリ: {DATA_DIR.relative_to(PROJECT_ROOT)}")
+# または
+print(f"データディレクトリ: data/raw")
+```
+
+**適用対象**:
+- Jupyter Notebookのprint文
+- ログ出力
+- エラーメッセージ
+- ドキュメント
+- Git commitメッセージ
+
+**例外**:
+- デバッグ時の一時的な出力（commit前に削除）
+
+#### 4. 📂 **Notebookでのデータ読み込みルール（重要）**
+
+**原則**: Jupyter Notebookでデータを読み込む際は**必ずDataLoaderパターン**を使用する
+
+```python
+# ❌ ハードコーディングされた相対パス（禁止）
+train = pl.read_parquet("02_data/processed/train.parquet")
+test = pl.read_parquet("../../data/raw/test.csv")
+
+# ✅ DataLoaderパターン（必須）
+from src.data.loader import DataLoader
+from src.utils.config import load_config
+
+data_config = load_config("data")
+loader = DataLoader(data_config)
+train = loader.load_train()
+test = loader.load_test()
+```
+
+**理由**:
+1. **設定の一元管理** - データパスは `03_configs/data.yaml` で管理
+2. **可搬性** - notebook実行場所に依存しない
+3. **一貫性** - すべてのnotebookで同じパターン
+4. **保守性** - パス変更時は設定ファイル1箇所の修正で済む
+5. **エラー防止** - 相対パスの解釈ミスを防ぐ
+
+**適用対象**:
+- すべてのJupyter Notebook（05_notebooks/**/*.ipynb）
+- データ読み込みが必要なスクリプト（08_scripts/*.py）
+
+**例外**:
+- 一時的な探索用notebook（commit前に削除）
+- テストデータの読み込み（07_tests/内）
+
+#### 5. ⚙️ **設定ファイル活用ルール**
+
+**原則**: ハードコーディング可能な値でも設定ファイルに記載する
+
+```python
+# ❌ コード内にハードコーディング
+DATA_DIR = "02_data/processed"
+RANDOM_SEED = 42
+CV_FOLDS = 5
+
+# ✅ 設定ファイルから読み込み
+# 03_configs/data.yaml
+data:
+  processed_dir: "02_data/processed"
+  random_seed: 42
+  cv_folds: 5
+
+# Python code
+config = load_config("data")
+DATA_DIR = config["data"]["processed_dir"]
+RANDOM_SEED = config["data"]["random_seed"]
+CV_FOLDS = config["data"]["cv_folds"]
+```
+
+**設定ファイル化すべき項目**:
+- ファイルパス（データ、モデル、ログ）
+- 乱数シード
+- CV分割数
+- ハイパーパラメータ
+- 閾値（外れ値除去、相関係数など）
+- フラグ（デバッグモード、実験モードなど）
+
+**メリット**:
+- 実験管理が容易（設定ファイルをGit管理）
+- 複数環境での動作保証
+- コードの再利用性向上
+
 - 品質: **仕様駆動 + テスト駆動で厳格に開発**
 - テスト: **必須**（07_tests/ に対応するテストコード）
 
