@@ -132,6 +132,9 @@ sample_*.txt
 Thumbs.db
 01_reference/
 
+# MCP servers (external repositories)
+mlit-dpf-mcp/
+
 # Progress tracking (not tracked in git)
 progress/
 docs/05_progress/
