@@ -38,8 +38,16 @@
 │   └── features.md           # 特徴量仕様
 │
 ├── 02_docs/                    # 📚 ドキュメント
+│   ├── README.md             # ドキュメント案内
 │   ├── data_definition.md    # データ定義書（149特徴量）
-│   └── table_definition.txt  # テーブル定義（テキスト版）
+│   ├── features/             # 特徴量カテゴリ別詳細
+│   └── guides/               # ガイド・Tips集（プロセス別）
+│       ├── README.md                    # ガイド索引
+│       ├── feature_engineering/         # 特徴量エンジニアリング
+│       ├── eda/                        # EDA
+│       ├── modeling/                   # モデリング
+│       ├── validation/                 # バリデーション
+│       └── tips/                       # 汎用Tips
 │
 ├── 03_configs/                 # ⚙️ 設定ファイル（YAML）
 │   ├── base.yaml             # プロジェクト基本情報
