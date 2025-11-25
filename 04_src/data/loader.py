@@ -2,6 +2,12 @@
 データ読み込みモジュール
 
 Polarsを使用してCSVファイルを読み込む
+
+デフォルトではマスター結合済みの enriched ファイルを読み込む:
+- data/processed/train_enriched.csv（都道府県名・市区町村名付き）
+- data/processed/test_enriched.csv
+
+生データが必要な場合は data.yaml の raw_train_path / raw_test_path を参照
 """
 
 from pathlib import Path
@@ -10,13 +16,19 @@ import polars as pl
 
 
 class DataLoader:
-    """データ読み込みクラス"""
+    """データ読み込みクラス
 
-    def __init__(self, config: Dict[str, Any], add_address_columns: bool = True):
+    Note:
+        enriched ファイルには既に都道府県名・市区町村名が含まれているため、
+        add_address_columns=False がデフォルト。
+    """
+
+    def __init__(self, config: Dict[str, Any], add_address_columns: bool = False):
         """
         Args:
             config: data.yaml の内容
-            add_address_columns: 都道府県・市区町村カラムを追加するかどうか（デフォルト: True）
+            add_address_columns: 都道府県・市区町村カラムを追加するかどうか
+                                 enriched使用時は False でOK（デフォルト: False）
         """
         self.config = config
         self.data_config = config.get("data", config)

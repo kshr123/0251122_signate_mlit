@@ -1,19 +1,19 @@
 # exp001_baseline - ベースラインモデル
 
-**実験日**: 2025-11-24
-**実験者**: System
+**実験日**: 2025-11-25
+**実験者**: Claude Code
 **ステータス**: ✅ 完了
 
 ---
 
 ## 📝 実験概要
 
-シンプルで再現性のあるベースラインモデルを構築し、初回提出を行う。
+Blockベース特徴量による再現性のあるベースラインモデルを構築。
 
 **目的**:
-- 最小限の特徴量で動作するベースラインを確立
+- Blockシステムを使った明示的な特徴量エンジニアリング
 - 3-Fold CVでの性能評価
-- 実験管理フロー（MLflow）の確立
+- 再現性の確保（シード固定）
 
 ---
 
@@ -23,15 +23,17 @@
 
 | Metric | Mean | Std | Min | Max |
 |--------|------|-----|-----|-----|
-| **MAPE** | **28.3432%** | **0.0883%** | 28.2762% | 28.4680% |
+| **MAPE** | **28.2933%** | **0.0597%** | 28.2231% | 28.3690% |
 
 ### Fold別スコア
 
-| Fold | MAPE (%) | Best Iteration |
-|------|----------|----------------|
-| 1    | 28.4680  | 100            |
-| 2    | 28.2762  | 100            |
-| 3    | 28.2854  | 100            |
+| Fold | MAPE (%) |
+|------|----------|
+| 1    | 28.3690  |
+| 2    | 28.2231  |
+| 3    | 28.2877  |
+
+**再現性**: ✅ 確認済み（2回実行で完全一致）
 
 ---
 
@@ -48,51 +50,39 @@
 ```yaml
 objective: regression
 metric: mape
-boosting: gbdt
 learning_rate: 0.05
 num_leaves: 31
-max_depth: -1
-min_child_samples: 20
-subsample: 0.8
-subsample_freq: 1
-colsample_bytree: 0.8
-reg_alpha: 0.0
-reg_lambda: 0.0
-random_state: 42
+seed: 42
+verbose: -1
+force_row_wise: true
 num_boost_round: 100
-early_stopping_rounds: 100
 ```
 
 ### 訓練設定
 
 - **CV手法**: 3-Fold KFold (shuffle=True)
 - **シード**: 42
-- **Early Stopping**: 100 rounds
 
 ---
 
-## 📊 データ
+## 📊 データ・特徴量
 
 ### データセット
 
 - **Train**: 363,924 samples × 149 features
 - **Test**: 112,437 samples × 149 features
 
-### 前処理
+### 前処理（Blockシステム）
 
-**前処理クラス**: `SimplePreprocessor`
+| Block | 処理内容 | 出力特徴量数 |
+|-------|---------|-------------|
+| TargetYmBlock | target_ym → year, month分解 | 2 |
+| NumericBlock | 数値特徴量選択 | 96 |
+| LabelEncodingBlock | カテゴリ→数値変換 | 8 |
+| **合計** | | **106** |
 
-1. `target_ym` の分解 → `target_year`, `target_month`
-2. 低カーディナリティカラムの抽出（閾値: 50）
-3. 欠損値は未補完（LightGBMの自動処理に任せる）
+### カテゴリカル特徴量（8個）
 
-### 特徴量
-
-- **特徴量数**: 106
-- **数値特徴量**: 96
-- **カテゴリカル特徴量**: 8 (低カーディナリティのみ)
-
-**カテゴリカル特徴量リスト**:
 - `building_name_ruby`
 - `reform_exterior`
 - `name_ruby`
@@ -102,53 +92,24 @@ early_stopping_rounds: 100
 - `free_rent_duration`
 - `free_rent_gen_timing`
 
-**注意**: `target_year`, `target_month` も含む
-
 ---
 
-## 🐛 発生した問題と解決策
+## 📂 ファイル構成
 
-### 問題1: train/testでデータ型が異なるカラム
-
-**症状**:
 ```
-ValueError: pandas dtypes must be int, float or bool.
-Fields with bad pandas dtypes: traffic_car: object
+exp001_baseline/
+├── README.md              # この文書
+├── code/
+│   ├── preprocessing.py   # Blockベース前処理
+│   ├── train.py           # 学習スクリプト
+│   └── predict.py         # 推論スクリプト
+├── features/
+│   ├── feature_list.txt
+│   ├── categorical_features.txt
+│   └── feature_engineering.md
+└── outputs/
+    └── submission_20251125_093656.csv
 ```
-
-**原因**:
-- Train: `traffic_car` が `Int64` 型
-- Test: `traffic_car` が `String` 型
-
-元データの型が異なるため、`SimplePreprocessor` で異なる扱いを受け、testデータのみ文字列として残る。
-
-**解決策**:
-trainとtestの両方で文字列型カラムを検出し、すべてCategorical → ordinalに変換:
-
-```python
-# trainとtestで型が異なる可能性があるため、両方で文字列型を検出
-string_cols_train = [col for col in X_train.columns if X_train[col].dtype == pl.Utf8]
-string_cols_test = [col for col in X_test.columns if X_test[col].dtype == pl.Utf8]
-string_cols = list(set(string_cols_train + string_cols_test))
-
-# すべての文字列型カラムを数値に変換
-for col in string_cols:
-    if col in X_train.columns and X_train[col].dtype == pl.Utf8:
-        X_train = X_train.with_columns(
-            pl.col(col).cast(pl.Categorical).to_physical().alias(col)
-        )
-    if col in X_test.columns and X_test[col].dtype == pl.Utf8:
-        X_test = X_test.with_columns(
-            pl.col(col).cast(pl.Categorical).to_physical().alias(col)
-        )
-```
-
----
-
-## 📂 生成ファイル
-
-- **提出ファイル**: `submission_20251124_122920.csv`
-- **MLflow Run ID**: `b1541b503505448d8567f82d22166a1d`
 
 ---
 
@@ -156,26 +117,12 @@ for col in string_cols:
 
 1. **特徴量追加**:
    - 住所情報（都道府県・市区町村名）の追加
-   - 高カーディナリティカラムのエンコーディング
+   - 高カーディナリティカラムのエンコーディング（CountEncoding, TargetEncoding）
 
 2. **モデル改善**:
+   - num_boost_round増加（Early Stopping未発動のため）
    - ハイパーパラメータチューニング（Optuna）
-   - アンサンブル
-
-3. **リファクタリング**:
-   - `DataLoader` でのデータ型統一
-   - 型チェック機能の追加
 
 ---
 
-## 📝 メモ
-
-- すべてのFoldで `best_iteration=100` → Early Stopping未発動
-  - `num_boost_round` を増やす余地あり
-- CV標準偏差が小さい（0.0883%）→ モデルが安定している
-- ベースライン完成により、以降の実験との比較が可能に
-
----
-
-**実験担当**: Claude Code
-**最終更新**: 2025-11-24 12:30
+**最終更新**: 2025-11-25 09:46

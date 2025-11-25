@@ -1,0 +1,76 @@
+# exp005: Log Transform + LR Tuning
+# ベース: exp004_age_features
+# 変更点:
+#   - 目的変数の対数変換（log1p）
+#   - learning_rate 0.01→0.03
+#   - n_estimators 10000→15000
+#   - old_building_flag削除
+
+experiment:
+  id: "exp005"
+  name: "log_transform"
+  base: "exp004_age_features"
+  description: "目的変数の対数変換 + Learning Rate調整 + 不要特徴量削除"
+
+training:
+  seed: 42
+  n_splits: 3
+  early_stopping_rounds: 1000
+
+  # 目的変数の変換
+  target_transform: "log1p"  # log(1 + y)、"none"で変換なし
+
+model:
+  type: "lightgbm"
+  params:
+    # 基本設定
+    objective: "regression"
+    metric: "mape"
+    boosting_type: "gbdt"
+
+    # 学習率（exp004: 0.01 → exp005: 0.03）
+    learning_rate: 0.03
+
+    # 木の構造
+    max_depth: 7
+    num_leaves: 63
+
+    # 正則化
+    reg_lambda: 1.0   # L2
+    reg_alpha: 0.1    # L1
+
+    # サンプリング（過学習防止）
+    colsample_bytree: 0.7
+    subsample: 0.9
+    subsample_freq: 3
+
+    # 分割条件
+    min_child_samples: 20
+
+    # イテレーション（exp004: 10000 → exp005: 15000）
+    n_estimators: 15000
+
+    # その他
+    importance_type: "gain"
+    verbose: -1
+    force_row_wise: true
+
+# 前処理設定
+preprocessing:
+  # 築年数関連
+  age_threshold: 35
+  area_threshold: 80
+  major_cities: [13, 14, 27]  # 東京、神奈川、大阪
+
+  # エンコーディング対象
+  target_encoding_columns:
+    - "addr1_1"
+    - "addr1_2"
+    - "bukken_type"
+    - "land_youto"
+    - "land_toshi"
+    - "building_age_bin"
+
+  # 削除する特徴量（exp004から変更）
+  drop_features:
+    - "old_building_flag"  # 重要度88位/89、building_ageと冗長

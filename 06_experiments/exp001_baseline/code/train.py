@@ -16,6 +16,7 @@ sys.path.insert(0, str(current_dir))
 project_root = Path(__file__).resolve().parents[3]
 sys.path.insert(1, str(project_root / "04_src"))
 
+import json
 import mlflow
 import polars as pl
 import lightgbm as lgb
@@ -87,6 +88,11 @@ def train_baseline():
         train = loader.load_train()
         test = loader.load_test()
 
+        # ID列を先に保存（前処理後に参照するため）
+        # train.csvにはIDがないので行番号を使用
+        train_ids = np.arange(len(train))
+        test_ids = test["id"].to_numpy()
+
         print(f"  - Train: {train.shape}")
         print(f"  - Test: {test.shape}")
 
@@ -134,6 +140,7 @@ def train_baseline():
         cv_scores = []
         oof_predictions = np.zeros(len(X_train))
         test_predictions = np.zeros(len(X_test))
+        feature_importance = np.zeros(len(ALL_FEATURES))
 
         # Polars → NumPy変換
         X_train_np = X_train.to_numpy()
@@ -184,6 +191,9 @@ def train_baseline():
             mape_score = calculate_mape(y_val, val_pred)
             cv_scores.append(mape_score)
 
+            # 特徴量重要度を蓄積（gain）
+            feature_importance += model.feature_importance(importance_type="gain") / N_SPLITS
+
             print(f"  Validation MAPE: {mape_score:.4f}%")
 
         # ===== CV結果まとめ =====
@@ -204,17 +214,57 @@ def train_baseline():
         mlflow.log_metric("oof_mape", oof_mape)
         print(f"\n  OOF MAPE: {oof_mape:.4f}%")
 
+        # 出力ディレクトリ作成
+        output_dir = Path(__file__).parent.parent / "outputs"
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        # ===== OOF予測保存（エラー分析用） =====
+        print("\n📊 OOF予測保存中...")
+        oof_df = pl.DataFrame({
+            "id": train_ids,
+            "actual": y_train_np,
+            "predicted": oof_predictions,
+        })
+        oof_path = output_dir / f"oof_predictions_{timestamp}.csv"
+        oof_df.write_csv(oof_path)
+        print(f"  ✓ 保存完了: {oof_path}")
+        mlflow.log_artifact(oof_path, artifact_path="predictions")
+
+        # ===== 特徴量重要度保存 =====
+        print("\n📊 特徴量重要度保存中...")
+        importance_dict = {
+            "feature": ALL_FEATURES,
+            "importance": feature_importance.tolist(),
+        }
+        # ソートして上位を表示
+        sorted_indices = np.argsort(feature_importance)[::-1]
+        print("  Top 10 Features:")
+        for i, idx in enumerate(sorted_indices[:10]):
+            print(f"    {i+1}. {ALL_FEATURES[idx]}: {feature_importance[idx]:.4f}")
+
+        # JSON形式で保存
+        importance_path = output_dir / f"feature_importance_{timestamp}.json"
+        with open(importance_path, "w", encoding="utf-8") as f:
+            json.dump(importance_dict, f, ensure_ascii=False, indent=2)
+        print(f"  ✓ 保存完了: {importance_path}")
+        mlflow.log_artifact(importance_path, artifact_path="feature_importance")
+
+        # CSV形式でも保存（可視化しやすい）
+        importance_df = pl.DataFrame({
+            "feature": ALL_FEATURES,
+            "importance": feature_importance,
+        }).sort("importance", descending=True)
+        importance_csv_path = output_dir / f"feature_importance_{timestamp}.csv"
+        importance_df.write_csv(importance_csv_path)
+        mlflow.log_artifact(importance_csv_path, artifact_path="feature_importance")
+
         # ===== 提出ファイル生成 =====
         print("\n📤 提出ファイル生成中...")
 
         submission = pl.DataFrame({
-            "id": test["id"],
+            "id": test_ids,
             "money_room": test_predictions,
         })
-
-        # 出力ディレクトリ作成
-        output_dir = Path(__file__).parent.parent / "outputs"
-        output_dir.mkdir(parents=True, exist_ok=True)
 
         submission_path = output_dir / f"submission_{timestamp}.csv"
         submission.write_csv(submission_path)
