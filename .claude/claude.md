@@ -185,7 +185,7 @@ uv pip install mlflow wandb optuna
 - **コンペ名**: 不動産価格予測（SIGNATE）
 - **開始日**: 2025-11-22
 - **締切**: 未設定
-- **現在のフェーズ**: Phase 1 - データ理解・フレームワーク構築
+- **現在のフェーズ**: Phase 2 - ベースラインモデル構築
 
 ### 完了タスク
 
@@ -212,15 +212,37 @@ uv pip install mlflow wandb optuna
   - 01_initial_eda.ipynb（初期EDA）
   - 02_target_analysis.ipynb（ターゲット変数分析）
 
-### 次のステップ
+**Phase 2: ベースラインモデル構築（方針転換）**
+- ✅ ベースライン仕様書作成（01_specs/baseline_model.md）
+  - MAPE指標、LightGBM、3-Fold CV、再現性確保
+- ✅ SeedManager実装（TDD完了、4 tests passed）
+  - features/base.py - 乱数シード固定
+- ✅ MAPE計算実装（TDD完了、5 tests passed）
+  - evaluation/metrics.py - sklearn.metrics wrapper
+- ✅ MLflow補助関数実装
+  - training/utils/mlflow_helper.py
+- ✅ 実験管理構成策定
+  - 06_experiments/の構成決定（実験ごとにディレクトリ分割）
+- ✅ 特徴量コンポーネント仕様書作成（01_specs/features_components.md）
+  - Blockベース設計、fit/transformパターン
+  - FeaturePipelineは実験固有のロジックとして扱う
+- ❌ SimplePreprocessor実装 → **削除**（抽象化されすぎ）
 
-**Phase 1続き: 実EDA実行**
-- [ ] 実際のデータでEDA実行
-- [ ] EDA結果の記録と知見の整理
+### 次のステップ（優先度順）
 
-**Phase 2: 前処理・特徴量**
-- [ ] Preprocessing モジュール
-- [ ] Features モジュール
+**Phase 2続き: 特徴量Blockシステム構築（最優先）**
+1. [ ] BaseBlock実装（TDD）- 04_src/features/base.py拡張
+2. [ ] NumericBlock実装（TDD）- 04_src/features/blocks/numeric.py
+3. [ ] TargetYmBlock実装（TDD）- 04_src/features/blocks/temporal.py
+4. [ ] LabelEncodingBlock実装（TDD）- 04_src/features/blocks/encoding.py
+5. [ ] exp001をゼロベースで再構築（新Block使用、明示的な前処理）
+6. [ ] 初回SIGNATE提出
+
+**Phase 3: 評価・改善（後回し）**
+- [ ] 評価モジュール実装（feature_importance, error_analysis, visualizer）
+- [ ] 追加Block実装（CountEncoding, TargetEncoding等）
+- [ ] ハイパーパラメータチューニング
+- [ ] アンサンブル
 
 詳細は [docs/](../docs/) と [specs/](../specs/) を参照してください。
 
@@ -304,6 +326,15 @@ uv pip install mlflow wandb optuna
 - EDA実践ガイド追加（eda_guide.md）- 即実行可能なコードテンプレート集
 - ドキュメント構成を4ファイルに整理
 
+**2025-11-24 (ベースラインモデル構築・方針転換)**:
+- ベースライン仕様書作成（MAPE、LightGBM、3-Fold CV）
+- 基本コンポーネント実装（SeedManager、MAPE、MLflow補助関数）
+- 実験管理構成策定（06_experiments/構造決定）
+- **方針転換**: SimplePreprocessor削除、Blockベース設計へ移行
+- 特徴量コンポーネント仕様書作成（features_components.md）
+  - BaseBlock + 個別Block（Numeric, TargetYm, LabelEncoding）
+  - FeaturePipelineは作らない（実験固有のロジック）
+
 ---
 
-**最終更新**: 2025-11-23
+**最終更新**: 2025-11-24

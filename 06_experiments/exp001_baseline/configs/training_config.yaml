@@ -1,0 +1,39 @@
+# 訓練全般の設定
+# exp001_baseline
+
+# 再現性
+seed: 42
+
+# クロスバリデーション
+cv:
+  method: KFold
+  n_splits: 3
+  shuffle: true
+  random_state: 42
+
+# 評価指標
+validation:
+  primary_metric: mape
+  additional_metrics:
+    - rmse
+    - mae
+
+# データパス
+data:
+  train_path: data/raw/train.csv
+  test_path: data/raw/test.csv
+  add_address_columns: false  # 都道府県・市区町村名は未使用
+
+# 実験管理
+experiment:
+  name: signate_mlit_rental_price
+  run_name_prefix: baseline
+  tags:
+    experiment_type: baseline
+    model_family: gbdt
+    version: v1
+
+# 出力
+output:
+  submission_dir: 06_experiments/exp001_baseline
+  submission_prefix: submission

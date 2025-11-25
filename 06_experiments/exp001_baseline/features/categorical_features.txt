@@ -1,0 +1,8 @@
+building_name_ruby
+reform_exterior
+name_ruby
+school_ele_code
+school_jun_code
+money_hoshou_company
+free_rent_duration
+free_rent_gen_timing

@@ -10,7 +10,7 @@
 - **コンペURL**: https://signate.jp/competitions/1365
 - **開始日**: 2025-11-22
 - **締切**: 未確認
-- **現在のフェーズ**: Phase 2完了 - ベースラインモデル構築完了（CV MAPE: 28.34%）
+- **現在のフェーズ**: Phase 3 - 特徴量Block拡充中（CV MAPE: 28.29%）
 
 ---
 
@@ -52,6 +52,32 @@
    - 提出ファイル生成（`06_experiments/exp001_baseline/submission_20251124_122920.csv`）
    - 実験ノート作成（`06_experiments/exp001_baseline/README.md`）
    - MLflow Run ID: b1541b503505448d8567f82d22166a1d
+
+7. **Block System実装とexp001再構築** (2025-11-24) ✅
+   - BaseBlock実装（TDD、4/4テスト通過）
+   - NumericBlock実装（TDD、6/6テスト通過）
+   - TargetYmBlock実装（TDD、5/5テスト通過）
+   - LabelEncodingBlock実装（TDD、6/6テスト通過）
+   - exp001_baseline再構築（Block System使用、明示的な前処理）
+   - **CV MAPE: 28.2933% ± 0.0597%** (改善: 28.34% → 28.29%)
+   - 提出ファイル生成（`06_experiments/exp001_baseline/outputs/submission_20251124_152018.csv`）
+
+8. **Encoding Block拡充** (2025-11-25) ✅
+   - CountEncodingBlock実装（TDD）
+   - TargetEncodingBlock実装（OOF方式でデータリーク防止、10テスト通過）
+   - OneHotEncodingBlock実装（min_count対応、12テスト通過）
+
+9. **Aggregation Block実装** (2025-11-25) ✅
+   - GroupByAggBlock実装（カテゴリ別数値統計、ratio/diff対応、9テスト通過）
+   - CategoryNuniqueBlock実装（カテゴリ間nunique、8テスト通過）
+
+10. **次元圧縮Block実装** (2025-11-25) ✅
+    - DimensionReductionBlock基底クラス実装（共通処理: 標準化、欠損処理）
+    - SVDBlock実装（TruncatedSVD、9テスト通過）
+    - PCABlock実装（主成分分析、3テスト通過）
+    - UMAPBlock実装（非線形次元圧縮、3テスト通過）
+    - 欠損値処理オプション追加（error/mean/zero）
+    - 依存関係追加: umap-learn
 
 ### 🔄 進行中のタスク
 
@@ -167,6 +193,193 @@ uv pip install mlflow lightgbm
   - `07_tests/test_training/test_mlflow_helper.py`（新規）
 
 #### 次のステップ
+
+---
+
+### 2025-11-24 (夕方): Block System実装とexp001_baseline再構築
+
+#### 背景
+
+SimplePreprocessorの問題点:
+- 過度な抽象化により処理内容が不透明
+- カーディナリティ自動判定のロジックが隠蔽されている
+- 実験ごとの柔軟な調整が困難
+
+→ **Block Systemを導入し、明示的な特徴量エンジニアリングに移行**
+
+#### 実施内容
+
+**1. Block System実装（TDD）**
+
+**BaseBlock** (`04_src/features/base.py`):
+- テスト: `07_tests/test_features/test_base.py`（4/4通過）
+- 機能:
+  - fit/transformインターフェース
+  - フィッティング状態管理
+  - SeedManager（乱数シード固定）
+
+**NumericBlock** (`04_src/features/blocks/numeric.py`):
+- テスト: `07_tests/test_features/test_blocks_numeric.py`（6/6通過）
+- 機能: 指定された数値特徴量を選択
+- 利点: 使用する特徴量が明示的
+
+**TargetYmBlock** (`04_src/features/blocks/temporal.py`):
+- テスト: `07_tests/test_features/test_blocks_temporal.py`（5/5通過）
+- 機能: YYYYMM形式の整数を年・月に分解
+- 実装:
+  ```python
+  target_year = target_ym // 100      # 202301 → 2023
+  target_month = target_ym % 100      # 202301 → 1
+  ```
+
+**LabelEncodingBlock** (`04_src/features/blocks/encoding.py`):
+- テスト: `07_tests/test_features/test_blocks_encoding.py`（6/6通過）
+- 機能: カテゴリカル変数を数値に変換
+- 対応型:
+  - Categorical型 → `to_physical()` で数値コードに変換
+  - Utf8型（文字列） → Categorical → `to_physical()`
+  - 数値型 → そのまま返す
+
+**2. exp001_baseline再構築**
+
+**preprocessing.py** (完全書き換え):
+```python
+# 明示的な特徴量リスト（106個）
+NUMERIC_FEATURES = [...]  # 96個
+CATEGORICAL_FEATURES = [...]  # 8個
+GENERATED_FEATURES = ["target_year", "target_month"]  # 2個
+ALL_FEATURES = NUMERIC_FEATURES + CATEGORICAL_FEATURES + GENERATED_FEATURES
+
+def preprocess_for_training(train, test):
+    # 1. TargetYmBlock: target_ym分解
+    target_ym_block = TargetYmBlock(source_col="target_ym")
+    train_ym = target_ym_block.fit(train)
+    test_ym = target_ym_block.transform(test)
+
+    # 2. NumericBlock: 数値特徴量選択
+    numeric_block = NumericBlock(columns=NUMERIC_FEATURES)
+    train_numeric = numeric_block.fit(train)
+    test_numeric = numeric_block.transform(test)
+
+    # 3. LabelEncodingBlock: カテゴリカル特徴量を数値化
+    encoding_block = LabelEncodingBlock(columns=CATEGORICAL_FEATURES)
+    train_categorical = encoding_block.fit(train)
+    test_categorical = encoding_block.transform(test)
+
+    # 4. 結合
+    X_train = pl.concat([train_numeric, train_categorical, train_ym], how="horizontal")
+    X_test = pl.concat([test_numeric, test_categorical, test_ym], how="horizontal")
+
+    return X_train, X_test, y_train
+```
+
+**train.py** (パス解決を修正):
+- 問題: local preprocessing.py と 04_src/preprocessing が競合
+- 解決: sys.pathの順序制御
+  ```python
+  current_dir = Path(__file__).resolve().parent
+  sys.path.insert(0, str(current_dir))  # 優先: ローカル
+  project_root = Path(__file__).resolve().parents[3]
+  sys.path.insert(1, str(project_root / "04_src"))  # 次: 共通コード
+  ```
+
+**3. 遭遇した問題と解決**
+
+**問題1: ImportError - preprocessing module conflict**
+- 原因: train.pyが04_src/preprocessingをインポートしていた
+- 解決: sys.pathで現在のディレクトリを優先
+
+**問題2: TypeError - DataLoader引数不足**
+- 原因: configパラメータを渡していなかった
+- 解決: YAMLファイルを読み込んで渡す
+
+**問題3: AttributeError - PosixPath.get()**
+- 原因: DataLoaderにPath objectではなくdictが必要
+- 解決: yaml.safe_load()で辞書に変換
+
+**問題4: AttributeError - load_train_test**
+- 原因: APIメソッド名の誤り
+- 解決: load_train() / load_test() に分割
+
+**問題5: FileNotFoundError - 相対パス**
+- 原因: DataLoaderが実行ディレクトリ基準で探す
+- 解決: 絶対パスに変換
+  ```python
+  data_config["data"]["train_path"] = str(project_root / config["data"]["train_path"])
+  ```
+
+**問題6: AttributeError - list.mean()**
+- 原因: mlflow_helper.log_cv_results()がnumpy array期待
+- 解決: `log_cv_results(np.array(cv_scores), ...)`
+
+#### 実験結果（exp001_baseline v2）
+
+**CV結果**:
+- **MAPE**: **28.2933% ± 0.0597%** (改善: 28.34% → 28.29%)
+- Min MAPE: 28.2231%
+- Max MAPE: 28.3690%
+
+**Fold別スコア**:
+| Fold | MAPE (%) |
+|------|----------|
+| 1    | 28.3690  |
+| 2    | 28.2231  |
+| 3    | 28.2877  |
+
+**改善点**:
+1. スコア改善: 28.34% → 28.29% (-0.05pp)
+2. 標準偏差減少: 0.0883% → 0.0597% (より安定)
+3. コードの透明性向上: 全特徴量が明示的に記述
+4. 再現性向上: Block単位でのテスト完備
+
+**データ**:
+- Train: 363,924 samples × 149 features
+- Test: 112,437 samples × 149 features
+- **使用特徴量**: 106（数値96 + カテゴリカル8 + temporal2）
+
+#### Block Systemの利点
+
+1. **透明性**: どの特徴量を使っているか一目瞭然
+2. **再利用性**: 各Blockは独立してテスト・再利用可能
+3. **柔軟性**: 実験ごとに特徴量の組み合わせを簡単に変更
+4. **保守性**: TDDにより各Blockの動作が保証されている
+5. **データリーク防止**: fit/transformパターンで学習データのみから統計量を学習
+
+#### 成果物
+
+**ソースコード**: 4ファイル
+- `04_src/features/base.py`（BaseBlock追加）
+- `04_src/features/blocks/numeric.py`（新規）
+- `04_src/features/blocks/temporal.py`（新規）
+- `04_src/features/blocks/encoding.py`（新規）
+
+**テストコード**: 4ファイル
+- `07_tests/test_features/test_base.py`（新規）
+- `07_tests/test_features/test_blocks_numeric.py`（新規）
+- `07_tests/test_features/test_blocks_temporal.py`（新規）
+- `07_tests/test_features/test_blocks_encoding.py`（新規）
+
+**実験コード**: 2ファイル（再構築）
+- `06_experiments/exp001_baseline/code/preprocessing.py`（完全書き換え）
+- `06_experiments/exp001_baseline/code/train.py`（パス解決修正）
+
+**実験成果物**:
+- 提出ファイル: `06_experiments/exp001_baseline/outputs/submission_20251124_152018.csv`
+- 112,437件の予測値
+
+#### 技術的な決定事項
+
+1. **Block System採用**: 過度な抽象化を避け、明示的な設計に
+2. **fit/transformパターン**: データリーク防止のベストプラクティス
+3. **Polars to_physical()**: カテゴリカル変数の効率的な数値化
+4. **sys.path制御**: ローカルモジュールと共通モジュールの共存
+
+#### 次のステップ
+
+1. **SIGNATE初回提出**: submission_20251124_152018.csv
+2. **exp002作成**: 追加特徴量（住所情報、周辺施設集約など）
+3. **Block追加実装**: SimpleImputeBlock、StandardScalerBlock等
+4. **ハイパーパラメータチューニング**: Optunaでの最適化
 
 ---
 
@@ -498,4 +711,4 @@ data/{raw,processed,external}
 
 ---
 
-**最終更新**: 2025-11-24
+**最終更新**: 2025-11-24 15:30 (Block System実装完了)

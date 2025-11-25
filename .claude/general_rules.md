@@ -148,6 +148,69 @@ lsof -ti:8000  # 空ならOK
 - **シンプルさ**: 複雑さを避け、明確で理解しやすいコードを書く
 - **ドキュメント**: 重要な関数・クラスにはdocstringやコメントを付ける
 
+### ライブラリ優先の原則（最重要）
+
+**自作ロジックよりも、確立されたライブラリを優先して使用すること。**
+
+#### なぜライブラリを優先するか
+
+| 観点 | 自作ロジック | ライブラリ |
+|------|-------------|-----------|
+| **バグのリスク** | 高い（エッジケース見落とし） | 低い（多くのユーザーによりテスト済み） |
+| **保守性** | 低い（自分で維持） | 高い（コミュニティがメンテナンス） |
+| **機能の網羅性** | 限定的 | 豊富（未知カテゴリ、欠損値処理など） |
+| **ドキュメント** | 自分で書く必要あり | 公式ドキュメントあり |
+| **実績** | なし | 本番環境での使用実績あり |
+
+#### 実装時のルール
+
+1. **まずライブラリを探す**: 実装したい機能がある場合、まず既存ライブラリを調査
+2. **車輪の再発明を避ける**: 同等機能のライブラリがあれば自作しない
+3. **ライブラリのラッパーを作る**: Blockパターンなどでライブラリをラップし、インターフェースを統一
+
+#### 例: カテゴリエンコーディング
+
+```python
+# ❌ 悪い例: 自作ロジック
+def fit(self, input_df):
+    self._fitted = True
+    return self.transform(input_df)  # マッピング未保存
+
+def transform(self, input_df):
+    # 毎回その場でエンコード → train/testで不整合の可能性
+    return input_df.with_columns(
+        pl.col(col).cast(pl.Categorical).to_physical()
+    )
+
+# ✅ 良い例: ライブラリ使用
+from category_encoders import OrdinalEncoder
+
+def fit(self, input_df):
+    self.encoder = OrdinalEncoder(
+        cols=self.columns,
+        handle_unknown='value',   # 未知カテゴリ → -1
+        handle_missing='value',   # 欠損値 → -2
+    )
+    self.encoder.fit(input_df.to_pandas())
+    self._fitted = True
+    return self.transform(input_df)
+
+def transform(self, input_df):
+    return pl.from_pandas(self.encoder.transform(input_df.to_pandas()))
+```
+
+#### 推奨ライブラリ（データ分析・ML）
+
+| 用途 | 推奨ライブラリ |
+|------|---------------|
+| カテゴリエンコーディング | `category_encoders`, `sklearn.preprocessing` |
+| 特徴量エンジニアリング | `feature_engine`, `featuretools` |
+| 欠損値補完 | `sklearn.impute`, `fancyimpute` |
+| スケーリング | `sklearn.preprocessing` |
+| クロスバリデーション | `sklearn.model_selection` |
+| ハイパーパラメータ最適化 | `optuna`, `hyperopt` |
+| 実験管理 | `mlflow`, `wandb` |
+
 ### Python
 
 - **スタイル**: PEP 8に準拠

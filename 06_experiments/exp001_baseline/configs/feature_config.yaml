@@ -1,0 +1,74 @@
+# 特徴量設定
+# exp001_baseline
+
+# 特徴量セット識別
+feature_set: baseline_v1
+total_features: 106
+
+# 数値特徴量
+numeric_features:
+  count: 96
+  source: raw  # 生データをそのまま使用
+  transformation: none
+  imputation: none  # LightGBM自動処理
+
+# カテゴリカル特徴量
+categorical_features:
+  method: label_encoding  # Polars Categorical → ordinal
+  cardinality_threshold: 50
+  count: 8
+  features:
+    - building_name_ruby
+    - reform_exterior
+    - name_ruby
+    - school_ele_code
+    - school_jun_code
+    - money_hoshou_company
+    - free_rent_duration
+    - free_rent_gen_timing
+
+# 生成特徴量
+generated_features:
+  count: 2
+  features:
+    - name: target_year
+      formula: target_ym // 100
+      type: numeric
+    - name: target_month
+      formula: target_ym % 100
+      type: numeric
+
+# 除外した特徴量
+excluded_features:
+  # 高カーディナリティ（>=50）は除外
+  high_cardinality_categorical: []  # SimplePreprocessorが自動除外
+
+  # 除外理由付き
+  system_columns:
+    - id  # 識別子
+    - money_room  # ターゲット変数
+    - target_ym  # 分解後は不要
+
+# 特徴量グループ（分析用）
+feature_groups:
+  location:
+    - pref_code
+    - city_code
+    # 住所名は未使用（今後追加予定）
+
+  property:
+    - floor_max
+    - floor_min
+    - age
+    - area_room
+    - area_balcony
+
+  temporal:
+    - target_year
+    - target_month
+
+# 備考
+notes: |
+  - ベースラインは最小限の特徴量エンジニアリング
+  - 高カーディナリティは未使用（今後のタスク）
+  - 住所テキスト情報は未使用（今後追加予定）
