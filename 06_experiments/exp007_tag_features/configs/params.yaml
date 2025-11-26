@@ -1,0 +1,45 @@
+# exp007_tag_features configuration
+# Based on exp006 with tag SVD features
+
+experiment:
+  id: "exp007"
+  name: "tag_features"
+  base: "exp006_route_features"
+  description: "Add building/unit tag SVD features (Multi-hot → TruncatedSVD)"
+
+training:
+  seed: 42
+  n_splits: 3
+  early_stopping_rounds: 100
+  target_transform: "log1p"  # exp005と同じ
+
+model:
+  type: "lightgbm"
+  params:
+    # exp006と同じパラメータ
+    objective: "regression"
+    metric: "mape"
+    boosting_type: "gbdt"
+    learning_rate: 0.03
+    n_estimators: 15000
+    max_depth: 8
+    num_leaves: 63
+    min_child_samples: 20
+    reg_lambda: 1.0
+    reg_alpha: 0.1
+    colsample_bytree: 0.8
+    subsample: 0.8
+    subsample_freq: 1
+    verbose: 1
+    force_col_wise: true
+
+# exp007-specific settings
+tag_features:
+  building_tag:
+    column: "building_tag_id"
+    svd_dim: 15
+    expected_variance_ratio: 0.905  # 90.5%
+  unit_tag:
+    column: "unit_tag_id"
+    svd_dim: 30
+    expected_variance_ratio: 0.867  # 86.7%
