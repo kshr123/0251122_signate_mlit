@@ -42,11 +42,18 @@ class BaseBlock:
     すべての特徴量処理Blockはこのクラスを継承します。
     fit/transformパターンでデータリークを防止します。
 
+    設計原則:
+        - fit(): 統計量を学習し、変換結果を返す
+        - transform(): 学習済み統計量で変換
+        - _transform(): 実際の変換ロジック（子クラスでオーバーライド）
+
+    子クラスの実装パターン:
+        1. Stateless（統計量不要）: _transform()のみオーバーライド
+        2. Stateful（統計量必要）: fit()と_transform()をオーバーライド
+
     Examples:
         >>> class MyBlock(BaseBlock):
-        ...     def transform(self, input_df):
-        ...         if not self._fitted:
-        ...             raise RuntimeError("MyBlock: fit()を先に実行してください")
+        ...     def _transform(self, input_df):
         ...         return input_df.select("feature_col")
         ...
         >>> block = MyBlock()
@@ -73,7 +80,7 @@ class BaseBlock:
             testデータでは必ずtransform()を使用してください。
         """
         self._fitted = True
-        return self.transform(input_df)
+        return self._transform(input_df)
 
     def transform(self, input_df: pl.DataFrame) -> pl.DataFrame:
         """学習した統計量で変換
@@ -92,4 +99,34 @@ class BaseBlock:
         """
         if not self._fitted:
             raise RuntimeError(f"{self.__class__.__name__}: fit()を先に実行してください")
+        return self._transform(input_df)
+
+    def _transform(self, input_df: pl.DataFrame) -> pl.DataFrame:
+        """実際の変換ロジック（子クラスでオーバーライド）
+
+        Args:
+            input_df: 入力DataFrame
+
+        Returns:
+            変換後のDataFrame
+
+        Note:
+            子クラスはこのメソッドをオーバーライドして変換ロジックを実装します。
+            fit()とtransform()の両方からこのメソッドが呼ばれます。
+        """
         raise NotImplementedError()
+
+    def fit_transform(self, input_df: pl.DataFrame, y: pl.Series = None) -> pl.DataFrame:
+        """fit()とtransform()を連続実行（sklearn互換）
+
+        Args:
+            input_df: 入力DataFrame（trainデータ）
+            y: ターゲット変数（Target Encodingなどで使用）
+
+        Returns:
+            変換後のDataFrame
+
+        Note:
+            このメソッドは内部でfit()を呼ぶため、trainデータにのみ使用してください。
+        """
+        return self.fit(input_df, y)

@@ -20,27 +20,24 @@ class GroupByAggBlock(BaseBlock):
     特徴:
     - trainデータで計算した統計量をtestデータにも適用
     - 未知カテゴリ: 全体平均で埋める
-    - オプションでratio（比率）とdiff（差分）も計算可能
+    - オプションで派生特徴量（ratio, diff）も計算可能
     - カラム名: groupby_{cat_column}_{num_column}_{agg}
 
     Args:
         cat_column: グループ化に使用するカテゴリカラム名
         num_columns: 集計対象の数値カラムリスト
-        aggs: 集計方法のリスト（"mean", "std", "min", "max", "median", "sum"等）
-        add_ratio_diff: Trueの場合、mean/min/maxに対してratio/diffも計算
+        aggs: 基本統計量のリスト（"mean", "std", "min", "max", "median", "sum"等）
+        derived: 派生特徴量のリスト（"ratio", "diff"）。mean/min/maxに対して計算
+                 - ratio: 元値 / 統計値
+                 - diff: 元値 - 統計値
 
     Examples:
-        >>> df = pl.DataFrame({
-        ...     "prefecture": ["東京", "東京", "大阪", "大阪"],
-        ...     "price": [1000, 2000, 1500, 2500],
-        ... })
         >>> block = GroupByAggBlock(
         ...     cat_column="prefecture",
         ...     num_columns=["price"],
-        ...     aggs=["mean", "std"]
+        ...     aggs=["mean", "std"],
+        ...     derived=["ratio"],  # 比率のみ追加
         ... )
-        >>> result = block.fit(df)
-        >>> # result.columns = ["groupby_prefecture_price_mean", "groupby_prefecture_price_std"]
     """
 
     def __init__(
@@ -48,21 +45,21 @@ class GroupByAggBlock(BaseBlock):
         cat_column: str,
         num_columns: list[str],
         aggs: list[str],
-        add_ratio_diff: bool = False
+        derived: list[str] | None = None,
     ):
         """初期化
 
         Args:
             cat_column: グループ化に使用するカテゴリカラム名
             num_columns: 集計対象の数値カラムリスト
-            aggs: 集計方法のリスト
-            add_ratio_diff: ratio/diffを追加するか
+            aggs: 基本統計量のリスト
+            derived: 派生特徴量のリスト（"ratio", "diff"）。デフォルト: None
         """
         super().__init__()
         self.cat_column = cat_column
         self.num_columns = num_columns
         self.aggs = aggs
-        self.add_ratio_diff = add_ratio_diff
+        self.derived = derived or []
         self.agg_dict_ = {}  # {(num_col, agg): {cat_value: stat_value}}
         self.global_stats_ = {}  # {(num_col, agg): global_value}
 
@@ -107,9 +104,9 @@ class GroupByAggBlock(BaseBlock):
                     self.global_stats_[(num_col, agg)] = pdf[num_col].agg(agg)
 
         self._fitted = True
-        return self.transform(input_df)
+        return self._transform(input_df)
 
-    def transform(self, input_df: pl.DataFrame) -> pl.DataFrame:
+    def _transform(self, input_df: pl.DataFrame) -> pl.DataFrame:
         """学習した統計量をマッピング
 
         Args:
@@ -117,12 +114,7 @@ class GroupByAggBlock(BaseBlock):
 
         Returns:
             集計特徴量のDataFrame
-
-        Raises:
-            RuntimeError: fit()を先に実行していない場合
         """
-        if not self._fitted:
-            raise RuntimeError("GroupByAggBlock: fit()を先に実行してください")
 
         # Polars → pandas変換
         pdf = input_df.to_pandas()
@@ -137,12 +129,12 @@ class GroupByAggBlock(BaseBlock):
             global_val = self.global_stats_[(num_col, agg)]
             out_df[col_name] = pdf[self.cat_column].map(mapping).fillna(global_val)
 
-            # ratio/diffを追加（mean, min, maxの場合のみ）
-            if self.add_ratio_diff and agg in ["mean", "min", "max"]:
-                # ratio = 元の値 / 統計値
-                out_df[f"{col_name}_ratio"] = pdf[num_col] / out_df[col_name]
-                # diff = 元の値 - 統計値
-                out_df[f"{col_name}_diff"] = pdf[num_col] - out_df[col_name]
+            # 派生特徴量を追加（mean, min, maxの場合のみ）
+            if agg in ["mean", "min", "max"] and self.derived:
+                if "ratio" in self.derived:
+                    out_df[f"{col_name}_ratio"] = pdf[num_col] / out_df[col_name]
+                if "diff" in self.derived:
+                    out_df[f"{col_name}_diff"] = pdf[num_col] - out_df[col_name]
 
         # プレフィックスを追加
         out_df = out_df.add_prefix(f"groupby_{self.cat_column}_")
@@ -224,9 +216,9 @@ class CategoryNuniqueBlock(BaseBlock):
             self.mapping_df_[groupby_col] = _df.to_dict()
 
         self._fitted = True
-        return self.transform(input_df)
+        return self._transform(input_df)
 
-    def transform(self, input_df: pl.DataFrame) -> pl.DataFrame:
+    def _transform(self, input_df: pl.DataFrame) -> pl.DataFrame:
         """学習したnuniqueをマッピング
 
         Args:
@@ -234,13 +226,7 @@ class CategoryNuniqueBlock(BaseBlock):
 
         Returns:
             nunique特徴量のDataFrame
-
-        Raises:
-            RuntimeError: fit()を先に実行していない場合
         """
-        if not self._fitted:
-            raise RuntimeError("CategoryNuniqueBlock: fit()を先に実行してください")
-
         # Polars → pandas変換
         pdf = input_df.to_pandas()
 

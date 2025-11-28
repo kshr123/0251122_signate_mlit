@@ -38,20 +38,7 @@ class NumericBlock(BaseBlock):
         super().__init__()
         self.columns = columns
 
-    def fit(self, input_df: pl.DataFrame, y: pl.Series = None) -> pl.DataFrame:
-        """統計量の学習（不要なのでそのままtransform）
-
-        Args:
-            input_df: 入力DataFrame
-            y: ターゲット変数（使用しない）
-
-        Returns:
-            変換後のDataFrame
-        """
-        self._fitted = True
-        return self.transform(input_df)
-
-    def transform(self, input_df: pl.DataFrame) -> pl.DataFrame:
+    def _transform(self, input_df: pl.DataFrame) -> pl.DataFrame:
         """指定されたカラムをそのまま返す
 
         Args:
@@ -59,11 +46,5 @@ class NumericBlock(BaseBlock):
 
         Returns:
             指定されたカラムのみを含むDataFrame
-
-        Raises:
-            RuntimeError: fit()を先に実行していない場合
         """
-        if not self._fitted:
-            raise RuntimeError("NumericBlock: fit()を先に実行してください")
-
         return input_df.select(self.columns)

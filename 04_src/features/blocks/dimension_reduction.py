@@ -30,6 +30,8 @@ class DimensionReductionBlock(BaseBlock):
             - "error": エラーを出す（デフォルト）
             - "mean": trainの平均で補完
             - "zero": 0で補完
+        random_state: 乱数シード
+        prefix: 出力カラム名のプレフィックス（Noneの場合はデフォルト命名規則）
     """
 
     def __init__(
@@ -39,6 +41,7 @@ class DimensionReductionBlock(BaseBlock):
         standardize: bool = True,
         handle_missing: str = "error",
         random_state: int = 42,
+        prefix: str | None = None,
     ):
         super().__init__()
         self.columns = columns
@@ -46,6 +49,7 @@ class DimensionReductionBlock(BaseBlock):
         self.standardize = standardize
         self.handle_missing = handle_missing
         self.random_state = random_state
+        self._custom_prefix = prefix  # Noneの場合は_get_prefix()を使用
 
         self.scaler_ = None
         self.reducer_ = None
@@ -61,6 +65,12 @@ class DimensionReductionBlock(BaseBlock):
 
     def _generate_column_names(self) -> list[str]:
         """出力カラム名を生成"""
+        # カスタムprefixが指定されていればそれを使用
+        if self._custom_prefix:
+            prefix = self._custom_prefix
+            return [f"{prefix}_{i}" for i in range(self.n_components)]
+
+        # デフォルト: _get_prefix() + カラム名
         prefix = self._get_prefix()
         n_cols = len(self.columns)
 
@@ -141,9 +151,9 @@ class DimensionReductionBlock(BaseBlock):
         self.reducer_.fit(pdf)
 
         self._fitted = True
-        return self.transform(input_df)
+        return self._transform(input_df)
 
-    def transform(self, input_df: pl.DataFrame) -> pl.DataFrame:
+    def _transform(self, input_df: pl.DataFrame) -> pl.DataFrame:
         """学習した変換を適用
 
         Args:
@@ -151,12 +161,7 @@ class DimensionReductionBlock(BaseBlock):
 
         Returns:
             次元圧縮後のDataFrame
-
-        Raises:
-            RuntimeError: fit()を先に実行していない場合
         """
-        if not self._fitted:
-            raise RuntimeError(f"{self.__class__.__name__}: fit()を先に実行してください")
 
         # Polars → pandas変換
         pdf = input_df.select(self.columns).to_pandas()

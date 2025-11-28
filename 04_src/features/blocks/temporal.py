@@ -48,9 +48,9 @@ class TargetYmBlock(BaseBlock):
             変換後のDataFrame
         """
         self._fitted = True
-        return self.transform(input_df)
+        return self._transform(input_df)
 
-    def transform(self, input_df: pl.DataFrame) -> pl.DataFrame:
+    def _transform(self, input_df: pl.DataFrame) -> pl.DataFrame:
         """YYYYMMを年・月に分解
 
         処理内容:
@@ -63,16 +63,10 @@ class TargetYmBlock(BaseBlock):
         Returns:
             target_year, target_month を含むDataFrame
 
-        Raises:
-            RuntimeError: fit()を先に実行していない場合
-
         Note:
             source_colは整数型（Int64等）である必要があります。
             YYYYMMフォーマット（例: 202301, 202412）を想定しています。
         """
-        if not self._fitted:
-            raise RuntimeError("TargetYmBlock: fit()を先に実行してください")
-
         return input_df.select([
             (pl.col(self.source_col) // 100).alias("target_year"),
             (pl.col(self.source_col) % 100).alias("target_month"),
