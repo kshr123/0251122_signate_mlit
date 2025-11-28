@@ -1,0 +1,129 @@
+# exp010_low_price_improvement 実験設定
+#
+# このファイルには実験のハイパーパラメータと設定を集約。
+# カラムリスト等のコード定数は constants.py を参照。
+
+# =============================================================================
+# 実験メタ情報
+# =============================================================================
+experiment:
+  id: "exp010"
+  name: "low_price_improvement"
+  base: "exp009_landprice"
+  description: "Improve low-price (<10M yen) prediction: unit price features, area-age interaction"
+
+# =============================================================================
+# 学習設定
+# =============================================================================
+training:
+  seed: 42
+  n_splits: 3
+  early_stopping_rounds: 200
+  target_transform: "log1p"
+
+# =============================================================================
+# モデルハイパーパラメータ
+# =============================================================================
+model:
+  type: "lightgbm"
+
+  # 本番用パラメータ
+  params:
+    objective: "regression"
+    metric: "l2"
+    boosting_type: "gbdt"
+    learning_rate: 0.05
+    n_estimators: 50000
+    max_depth: 10
+    num_leaves: 127
+    min_child_samples: 15
+    reg_lambda: 1.0
+    reg_alpha: 0.1
+    colsample_bytree: 0.8
+    subsample: 0.8
+    subsample_freq: 1
+    verbose: 1
+    force_col_wise: true
+
+  # テスト用パラメータ（--test フラグで使用）
+  params_test:
+    objective: "regression"
+    metric: "l2"
+    boosting_type: "gbdt"
+    learning_rate: 0.5
+    n_estimators: 10
+    max_depth: 6
+    num_leaves: 31
+    min_child_samples: 20
+    reg_lambda: 1.0
+    reg_alpha: 0.1
+    colsample_bytree: 0.8
+    subsample: 0.8
+    subsample_freq: 1
+    verbose: -1
+    force_col_wise: true
+
+# =============================================================================
+# 特徴量変換パラメータ
+# =============================================================================
+features:
+  # TF-IDF
+  tfidf:
+    max_features: 20
+
+  # PCA/SVD次元数
+  geo_pca:
+    n_components: 2
+
+  building_tag_svd:
+    n_components: 15  # 累積寄与率 90.5%
+
+  unit_tag_svd:
+    n_components: 30  # 累積寄与率 86.7%
+
+  statuses_svd:
+    n_components: 30  # 累積寄与率 78.8%（143コード）
+
+  reform_svd:
+    n_components: 7   # 累積寄与率 93.3%
+
+  # 郵便番号TE
+  postal_te:
+    post_full_min_count: 30
+
+  # 地価公示
+  landprice:
+    max_distance_km: 5.0
+    impute_missing: true
+    shape_pca_dim: 1
+    road_svd_dim: 13      # 累積寄与率 91%
+    current_use_top_n: 10
+    category_ratio_columns:
+      - "post1"
+      - "post_full"
+      - "addr1_1"
+      - "addr1_2"
+      - "bukken_type"
+      - "land_youto"
+      - "land_toshi"
+      - "building_age_bin"
+      - "rosen_name1"
+
+# =============================================================================
+# exp010固有: 低価格帯改善
+# =============================================================================
+exp010:
+  # 築年数・面積閾値
+  thresholds:
+    age_threshold: 35           # 築年数閾値: 66%ile付近
+    area_threshold: 80          # 面積閾値: 50%ile付近
+    major_cities: [13, 14, 23, 27]  # 東京、神奈川、愛知、大阪
+
+  # 面積×築年数カテゴリ閾値
+  area_age_category:
+    # カテゴリ2: 最も予測困難（MAPE 20.24%）
+    cat2_area_threshold: 150    # 150㎡以上
+    cat2_age_threshold: 45      # 45年以上
+    # カテゴリ1: 中程度（MAPE 16.16%）
+    cat1_area_threshold: 100    # 100㎡以上
+    cat1_age_threshold: 35      # 35年以上

@@ -277,18 +277,76 @@ test_umap = block.transform(test_df)
 
 ## 3. 共通の注意点
 
-### 3.1 データリーク防止
+### 3.1 sklearn互換 fit/transform/fit_transform パターン【必須】
 
-**fit/transformパターンを厳守:**
+**すべてのTransformerは以下の3メソッドを必ず実装すること:**
+
 ```python
-# ✅ 正しい
-block = SomeBlock(...)
-train_features = block.fit(train_df)      # trainで学習
-test_features = block.transform(test_df)  # testは変換のみ
+class SomeTransformer:
+    def fit(self, df: pl.DataFrame) -> "SomeTransformer":
+        """学習データでパラメータを学習"""
+        # 学習ロジック
+        return self  # 必ず self を返す
+
+    def fit_transform(self, df: pl.DataFrame) -> pl.DataFrame:
+        """fitしてtransform（sklearn互換）"""
+        return self.fit(df).transform(df)  # 必ずこの実装
+
+    def transform(self, df: pl.DataFrame) -> pl.DataFrame:
+        """変換を適用"""
+        # 変換ロジック
+        return result_df
+```
+
+**呼び出し方（厳守）:**
+```python
+# ✅ 正しい呼び出し方
+transformer = SomeTransformer(...)
+train_result = transformer.fit_transform(train_df)  # trainはfit_transform
+test_result = transformer.transform(test_df)        # testはtransformのみ
+
+# ❌ 誤り（冗長）
+transformer = SomeTransformer(...)
+transformer.fit(train_df)
+train_result = transformer.transform(train_df)  # fit_transformを使え
+test_result = transformer.transform(test_df)
 
 # ❌ 誤り（データリーク）
-block = SomeBlock(...)
-all_features = block.fit(concat([train_df, test_df]))  # testを含めてfit
+transformer = SomeTransformer(...)
+all_result = transformer.fit_transform(concat([train_df, test_df]))  # testを含めてfit
+```
+
+**パラメータを持たない変換でも3メソッドを実装する理由:**
+
+1. **抽象化・一貫性**: 呼び出し元コードがすべてのTransformerを同じインターフェースで扱える
+2. **将来の拡張性**: 後からスムージングや正規化を追加する際にインターフェース変更が不要
+3. **パイプライン統合**: sklearn Pipelineや自作パイプラインに組み込み可能
+
+```python
+# ✅ 正しい（パラメータなしでも3メソッド実装）
+class SimpleRatioTransformer:
+    def fit(self, df: pl.DataFrame = None) -> "SimpleRatioTransformer":
+        """fitで何もしなくてもメソッドは必要"""
+        return self
+
+    def fit_transform(self, df: pl.DataFrame) -> pl.DataFrame:
+        """fitしてtransform（sklearn互換）"""
+        return self.fit(df).transform(df)
+
+    def transform(self, df: pl.DataFrame) -> pl.DataFrame:
+        return df.with_columns(...)
+
+# 使い方（パラメータなしでも同じパターン）
+transformer = SimpleRatioTransformer()
+train_result = transformer.fit_transform(train_df)  # trainはfit_transform
+test_result = transformer.transform(test_df)        # testはtransformのみ
+
+# ❌ 誤り（fit_transformがない）
+class SimpleRatioTransformer:
+    def fit(self, df):
+        return self
+    def transform(self, df):
+        return df.with_columns(...)  # fit_transformメソッドがない
 ```
 
 ### 3.2 欠損値の扱い

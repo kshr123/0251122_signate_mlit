@@ -1,0 +1,58 @@
+# exp008_reform_features configuration
+# Based on exp007 with reform SVD + postal code TE
+
+experiment:
+  id: "exp008"
+  name: "reform_features"
+  base: "exp007_tag_features"
+  description: "Add reform SVD, reform years, postal code TE, fix reference year"
+
+training:
+  seed: 42
+  n_splits: 3
+  early_stopping_rounds: 100
+  target_transform: "log1p"
+
+model:
+  type: "lightgbm"
+  params:
+    # exp007と同じパラメータ
+    objective: "regression"
+    metric: "l2"  # log1p変換時はMSEでearly stopping（MAPEは元スケールで別途計算）
+    boosting_type: "gbdt"
+    learning_rate: 0.03
+    n_estimators: 20000
+    max_depth: 8
+    num_leaves: 63
+    min_child_samples: 20
+    reg_lambda: 1.0
+    reg_alpha: 0.1
+    colsample_bytree: 0.8
+    subsample: 0.8
+    subsample_freq: 1
+    verbose: 1
+    force_col_wise: true
+
+# exp007から継承
+tag_features:
+  building_tag:
+    column: "building_tag_id"
+    svd_dim: 15
+  unit_tag:
+    column: "unit_tag_id"
+    svd_dim: 30
+
+# exp008-specific settings
+reform_features:
+  svd_dim: 7
+  expected_variance_ratio: 0.933  # 93.3%
+  columns:
+    wet_area: "reform_wet_area"
+    interior: "reform_interior"
+    wet_area_date: "reform_wet_area_date"
+    interior_date: "reform_interior_date"
+
+postal_code_te:
+  post1_column: "post1"
+  post2_column: "post2"
+  post_full_min_count: 30

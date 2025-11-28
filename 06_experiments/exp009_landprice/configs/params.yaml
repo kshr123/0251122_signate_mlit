@@ -1,0 +1,108 @@
+# exp009_landprice configuration
+# Based on exp008 with land price public data features (+39 dims)
+
+experiment:
+  id: "exp009"
+  name: "landprice"
+  base: "exp008_reform_features"
+  description: "Add land price features: shape PCA, road SVD, current use LE, price timeseries, category ratios"
+
+training:
+  seed: 42
+  n_splits: 3
+  early_stopping_rounds: 200   # 100→200（安定性向上）
+  target_transform: "log1p"
+
+model:
+  type: "lightgbm"
+  # 本番用パラメータ
+  params:
+    # exp008ベース + 表現力向上（22276で収束したため）
+    objective: "regression"
+    metric: "l2"
+    boosting_type: "gbdt"
+    learning_rate: 0.05
+    n_estimators: 50000
+    max_depth: 10             # 8→10
+    num_leaves: 127           # 63→127（2^7-1）
+    min_child_samples: 15     # 20→15
+    reg_lambda: 1.0           # 維持（過学習防止）
+    reg_alpha: 0.1            # 維持
+    colsample_bytree: 0.8
+    subsample: 0.8
+    subsample_freq: 1
+    verbose: 1
+    force_col_wise: true
+  # テスト用パラメータ（高速実行）
+  params_test:
+    objective: "regression"
+    metric: "l2"
+    boosting_type: "gbdt"
+    learning_rate: 0.1
+    n_estimators: 100
+    max_depth: 6
+    num_leaves: 31
+    min_child_samples: 20
+    reg_lambda: 1.0
+    reg_alpha: 0.1
+    colsample_bytree: 0.8
+    subsample: 0.8
+    subsample_freq: 1
+    verbose: -1
+    force_col_wise: true
+
+# exp007から継承
+tag_features:
+  building_tag:
+    column: "building_tag_id"
+    svd_dim: 15
+  unit_tag:
+    column: "unit_tag_id"
+    svd_dim: 30
+
+# exp008から継承
+reform_features:
+  svd_dim: 7
+  columns:
+    wet_area: "reform_wet_area"
+    interior: "reform_interior"
+    wet_area_date: "reform_wet_area_date"
+    interior_date: "reform_interior_date"
+
+postal_code_te:
+  post1_column: "post1"
+  post2_column: "post2"
+  post_full_min_count: 30
+
+# exp009-specific settings (地価公示データ)
+landprice:
+  max_distance_km: 5.0
+  impute_missing: true
+
+  # 基本特徴量 (21次元)
+  shape_pca:
+    n_components: 1
+  road_svd:
+    n_components: 13
+    expected_variance_ratio: 0.91
+  current_use_le:
+    top_n: 10
+
+  # カテゴリ別地価比率 (18次元: 9カテゴリ × 2)
+  category_ratio:
+    columns:
+      - "post1"           # 郵便番号上3桁
+      - "post_full"       # 郵便番号7桁
+      - "addr1_1"         # 都道府県コード
+      - "addr1_2"         # 市区町村コード
+      - "bukken_type"     # 物件タイプ
+      - "land_youto"      # 用途地域
+      - "land_toshi"      # 都市計画
+      - "building_age_bin"  # 築年数カテゴリ
+      - "rosen_name1"     # 路線名1
+
+  # 価格時系列 (2次元)
+  price_timeseries:
+    features:
+      - "lp_ratio_1to3"  # 1年前 / 3年前
+      - "lp_ratio_3to5"  # 3年前 / 5年前

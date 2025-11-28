@@ -1,0 +1,179 @@
+# exp011_loss_function 実験設定
+#
+# 損失関数の比較実験。CLIで --objective を指定して切り替え。
+#
+# 使用例:
+#   python train.py --objective huber
+#   python train.py --objective quantile --alpha 0.3
+#   python train.py --objective sample_weight --weight-transform inverse
+#   python train.py --objective focal --gamma 2.0
+
+# =============================================================================
+# 実験メタ情報
+# =============================================================================
+experiment:
+  id: "exp011"
+  name: "loss_function"
+  base: "exp010_low_price_improvement"
+  description: "Compare loss functions for low-price prediction improvement"
+
+# =============================================================================
+# 学習設定
+# =============================================================================
+training:
+  seed: 42
+  n_splits: 3
+  early_stopping_rounds: 200
+  target_transform: "log1p"
+
+# =============================================================================
+# 損失関数設定（デフォルト値、CLIで上書き可能）
+# =============================================================================
+loss:
+  # 目的関数タイプ: mse, huber, quantile, sample_weight, mape, focal
+  objective_type: "mse"
+
+  # quantile用
+  alpha: 0.5
+
+  # sample_weight用
+  weight_column: "target"      # "target" = y、または特徴量カラム名
+  weight_transform: "inverse"  # inverse, sqrt_inverse, log_inverse, threshold
+  threshold: 1000              # threshold方式の閾値（万円）
+  weight_below: 2.0            # threshold方式の低価格側重み
+  weight_above: 1.0            # threshold方式の高価格側重み
+
+  # mape用
+  hessian_const: 1.0           # ヘシアン近似値（0.1〜2.0、大きいほど慎重）
+
+  # focal用
+  gamma: 2.0
+
+# =============================================================================
+# モデルハイパーパラメータ
+# =============================================================================
+model:
+  type: "lightgbm"
+
+  # 本番用パラメータ
+  params:
+    objective: "regression"
+    metric: "l2"
+    boosting_type: "gbdt"
+    learning_rate: 0.05
+    n_estimators: 50000
+    max_depth: 10
+    num_leaves: 127
+    min_child_samples: 15
+    reg_lambda: 1.0
+    reg_alpha: 0.1
+    colsample_bytree: 0.8
+    subsample: 0.8
+    subsample_freq: 1
+    verbose: -1
+    force_col_wise: true
+
+  # テスト用パラメータ（--test フラグで使用）
+  params_test:
+    objective: "regression"
+    metric: "l2"
+    boosting_type: "gbdt"
+    learning_rate: 0.5
+    n_estimators: 10
+    max_depth: 6
+    num_leaves: 31
+    min_child_samples: 20
+    reg_lambda: 1.0
+    reg_alpha: 0.1
+    colsample_bytree: 0.8
+    subsample: 0.8
+    subsample_freq: 1
+    verbose: -1
+    force_col_wise: true
+
+# =============================================================================
+# 特徴量変換パラメータ
+# =============================================================================
+features:
+  # TF-IDF
+  tfidf:
+    max_features: 20
+
+  # PCA/SVD次元数
+  geo_pca:
+    n_components: 2
+
+  building_tag_svd:
+    n_components: 15  # 累積寄与率 90.5%
+
+  unit_tag_svd:
+    n_components: 30  # 累積寄与率 86.7%
+
+  statuses_svd:
+    n_components: 30  # 累積寄与率 78.8%（143コード）
+
+  reform_svd:
+    n_components: 7   # 累積寄与率 93.3%
+
+  # 郵便番号TE
+  postal_te:
+    post_full_min_count: 30
+
+  # 地価公示
+  landprice:
+    max_distance_km: 5.0
+    impute_missing: true
+    shape_pca_dim: 1
+    road_svd_dim: 13      # 累積寄与率 91%
+    current_use_top_n: 10
+    category_ratio_columns:
+      - "post1"
+      - "post_full"
+      - "addr1_1"
+      - "addr1_2"
+      - "bukken_type"
+      - "land_youto"
+      - "land_toshi"
+      - "building_age_bin"
+      - "rosen_name1"
+
+# =============================================================================
+# exp010継承: 低価格帯改善
+# =============================================================================
+exp010:
+  # 築年数・面積閾値
+  thresholds:
+    age_threshold: 35           # 築年数閾値: 66%ile付近
+    area_threshold: 80          # 面積閾値: 50%ile付近
+    major_cities: [13, 14, 23, 27]  # 東京、神奈川、愛知、大阪
+
+  # 面積×築年数カテゴリ閾値
+  area_age_category:
+    # カテゴリ2: 最も予測困難（MAPE 20.24%）
+    cat2_area_threshold: 150    # 150㎡以上
+    cat2_age_threshold: 45      # 45年以上
+    # カテゴリ1: 中程度（MAPE 16.16%）
+    cat1_area_threshold: 100    # 100㎡以上
+    cat1_age_threshold: 35      # 35年以上
+
+# =============================================================================
+# Phase 3: スタッキング設定
+# =============================================================================
+stacking:
+  # メタモデル: ridge / lightgbm
+  meta_model: "ridge"
+
+  # メタモデルパラメータ
+  meta_params:
+    ridge:
+      alpha: 1.0
+    lightgbm:
+      n_estimators: 100
+      learning_rate: 0.1
+      max_depth: 3
+      verbose: -1
+
+  # バリデーション設定
+  cv:
+    n_splits: 3
+    seed: 42

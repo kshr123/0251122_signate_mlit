@@ -6,7 +6,34 @@ YAML形式の設定ファイルを読み込み、マージする機能を提供
 
 from pathlib import Path
 from typing import Any, Dict, Union
+
 import yaml
+
+
+def deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    2つの辞書を再帰的にマージ（override側が優先）
+
+    Args:
+        base: ベースとなる辞書
+        override: 上書きする辞書
+
+    Returns:
+        マージされた辞書
+
+    Examples:
+        >>> base = {"a": 1, "b": {"x": 10, "y": 20}}
+        >>> override = {"b": {"y": 30, "z": 40}, "c": 3}
+        >>> deep_merge(base, override)
+        {"a": 1, "b": {"x": 10, "y": 30, "z": 40}, "c": 3}
+    """
+    result = base.copy()
+    for key, value in override.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = deep_merge(result[key], value)
+        else:
+            result[key] = value
+    return result
 
 
 class Config:
