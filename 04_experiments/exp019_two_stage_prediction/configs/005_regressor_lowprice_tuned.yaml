@@ -1,0 +1,145 @@
+# =============================================================================
+# 005_regressor_lowprice_tuned - チューニング済み低価格専用回帰モデル
+# =============================================================================
+
+meta:
+  name: "チューニング済み低価格専用回帰モデル"
+  description: |
+    分類器で「低価格」と判定されたサンプルに特化した回帰モデル。
+    Optunaで22トライアル、MAPE最小化でチューニング。
+    Best: MAPE=13.14%, RMSE=1.51M
+  parent: "003_regressor_lowprice"
+  created_at: "2024-12-07"
+
+experiment:
+  id: "exp019"
+  name: "exp019_regressor_lowprice_tuned"
+  description: "2段階予測 - Stage2a: チューニング済み低価格専用回帰器"
+
+# -----------------------------------------------------------------------------
+# 学習設定
+# -----------------------------------------------------------------------------
+training:
+  seed: 42
+
+  # CV設定（KFold - 回帰タスク）
+  cv:
+    strategy: "kfold"
+    kfold:
+      n_splits: 5
+      shuffle: true
+      random_state: 42
+
+  # ターゲット変換
+  target:
+    transform: "log1p"
+    inverse: "expm1"
+
+  # データフィルタリング（低価格のみ）
+  data_filter:
+    use_true_label: true
+
+# -----------------------------------------------------------------------------
+# モデル設定（LightGBM Regressor - Optunaチューニング済み）
+# -----------------------------------------------------------------------------
+model:
+  type: "lgbm"
+
+  # 本番パラメータ（Optunaチューニング済み: Trial 21）
+  params:
+    objective: "regression"
+    metric: "l2"
+    boosting_type: "gbdt"
+
+    # 学習率・木の構造（チューニング済み）
+    learning_rate: 0.0318
+    num_leaves: 110
+    max_depth: 11
+
+    # 正則化（チューニング済み）
+    min_child_samples: 107
+    min_child_weight: 42.3
+    reg_alpha: 0.092
+    reg_lambda: 3.87
+
+    # サンプリング（チューニング済み）
+    feature_fraction: 0.589
+    bagging_fraction: 0.945
+    bagging_freq: 5
+
+    # 学習設定
+    n_estimators: 10000
+    early_stopping_rounds: 200
+
+    # その他
+    verbose: -1
+    n_jobs: -1
+
+  # テスト用パラメータ（高速化）
+  params_test:
+    objective: "regression"
+    metric: "l2"
+    boosting_type: "gbdt"
+    learning_rate: 0.1
+    num_leaves: 31
+    max_depth: 6
+    min_child_samples: 20
+    n_estimators: 100
+    early_stopping_rounds: 10
+    verbose: -1
+    n_jobs: -1
+
+# -----------------------------------------------------------------------------
+# 特徴量設定
+# -----------------------------------------------------------------------------
+features:
+  # TF-IDF
+  tfidf:
+    max_features: 20
+
+  # 地理情報PCA
+  geo_pca:
+    n_components: 2
+
+  # タグSVD
+  building_tag_svd:
+    n_components: 15
+  unit_tag_svd:
+    n_components: 30
+  statuses_svd:
+    n_components: 30
+  reform_svd:
+    n_components: 7
+
+  # 地価公示
+  landprice:
+    road_svd_dim: 13
+
+  # ビニング
+  binning:
+    density_bin:
+      percentiles: [10, 30, 70]
+
+# -----------------------------------------------------------------------------
+# 評価設定
+# -----------------------------------------------------------------------------
+evaluation:
+  primary_metric: "mape"
+  secondary_metrics:
+    - "rmse"
+    - "mae"
+    - "median_ae"
+  segment_evaluation:
+    enabled: true
+    segments:
+      - name: "bottom_20"
+        quantile: 0.2
+        weight: 2.0
+
+# -----------------------------------------------------------------------------
+# 出力設定
+# -----------------------------------------------------------------------------
+output:
+  save_model: true
+  save_predictions: true
+  save_feature_importance: true
